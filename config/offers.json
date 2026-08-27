@@ -1,31 +1,51 @@
 {
-  "stripe_account": "acct_1RyhGMLKosW7tuDB",
-  "stripe_account_name": "Mooremotionmedia",
+  "stripe_account": "acct_1U8z57LpItqfVyEm",
+  "stripe_account_name": "322 Media LLC",
   "livemode": true,
   "currency": "usd",
   "offers": {
     "audit": {
-      "name": "AI Visibility Audit", "price_usd": 197, "unit_amount": 19700,
+      "name": "AI Visibility Audit",
+      "price_usd": 197,
+      "unit_amount": 19700,
       "delivery": "24 hours",
-      "product": "prod_V9HRwC5c1I6F0K", "price": "price_1U8yt2LKosW7tuDBmfY6kRXV",
-      "payment_link": "plink_1U8ytYLKosW7tuDBP2p83q7I",
-      "url": "https://buy.stripe.com/9B600k87ggIwaKf5QK5Ne01"
+      "product": "prod_V9IqUdXw4HQMt5",
+      "price": "price_1U90EeLpItqfVyEmjOSUA1eF",
+      "payment_link": "plink_1U90F2LpItqfVyEm31I4dibo",
+      "url": "https://buy.stripe.com/00w28s97c7wn3W7cuH7Re00"
     },
     "fix": {
-      "name": "AI Visibility Fix", "price_usd": 497, "unit_amount": 49700,
+      "name": "AI Visibility Fix",
+      "price_usd": 497,
+      "unit_amount": 49700,
       "delivery": "5 pages / 5 days",
-      "product": "prod_V9HSjcJ4ZfDh75", "price": "price_1U8yt9LKosW7tuDBr7AlX4uR",
-      "payment_link": "plink_1U8yteLKosW7tuDB9MCE8oUq",
-      "url": "https://buy.stripe.com/eVq9AU9bk2RG8C72Ey5Ne02"
+      "product": "prod_V9Iqdeyg6faOat",
+      "price": "price_1U90ElLpItqfVyEmskeXEk1E",
+      "payment_link": "plink_1U90FBLpItqfVyEmyA9UKzwj",
+      "url": "https://buy.stripe.com/28EaEYdns2c3gIT66j7Re01"
     },
     "overhaul": {
-      "name": "Full AI Visibility Overhaul", "price_usd": 1497, "unit_amount": 149700,
+      "name": "Full AI Visibility Overhaul",
+      "price_usd": 1497,
+      "unit_amount": 149700,
       "delivery": "site-wide / 14 days",
-      "product": "prod_V9HSz7KDZeyYhK", "price": "price_1U8ytHLKosW7tuDBAK2FA2lq",
-      "payment_link": "plink_1U8ytlLKosW7tuDBBmMF7Q5A",
-      "url": "https://buy.stripe.com/4gM14o2MWdwkg4zbb45Ne03"
+      "product": "prod_V9IqFmXuca4wjb",
+      "price": "price_1U90ErLpItqfVyEm18fcPD0E",
+      "payment_link": "plink_1U90FILpItqfVyEmN3fZcvz8",
+      "url": "https://buy.stripe.com/dRm9AUbfk17Z8cnfGT7Re02"
     }
   },
   "invoice_creation": true,
-  "created_at": "2026-08-27"
+  "site": "https://aivisibilityfix.co/",
+  "created_at": "2026-08-27",
+  "superseded": {
+    "account": "acct_1RyhGMLKosW7tuDB",
+    "name": "Mooremotionmedia",
+    "note": "Links on the prior account are no longer referenced by the site. They remain active in Stripe and must be deactivated from that account's dashboard.",
+    "links": {
+      "audit": "https://buy.stripe.com/9B600k87ggIwaKf5QK5Ne01",
+      "fix": "https://buy.stripe.com/eVq9AU9bk2RG8C72Ey5Ne02",
+      "overhaul": "https://buy.stripe.com/4gM14o2MWdwkg4zbb45Ne03"
+    }
+  }
 }
