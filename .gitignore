@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+raw/
+audits/*/screenshots/
+
+# Contact PII - never publish
+data/
+
+# Prospect analysis - working data, not published
+audits/
