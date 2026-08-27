@@ -1,7 +1,11 @@
 {
-  "url": "https://chadstrats-ship-it.github.io/ai-visibility-fix/",
+  "url": "https://aivisibilityfix.co/",
+  "legacy_url": "https://chadstrats-ship-it.github.io/ai-visibility-fix/",
   "repo": "https://github.com/chadstrats-ship-it/ai-visibility-fix",
   "host": "github-pages",
   "source": "main /docs",
+  "custom_domain": "aivisibilityfix.co",
+  "https_enforced": true,
+  "registrar": "namecheap",
   "deployed_at": "2026-08-27"
 }
