@@ -32,6 +32,10 @@ COUNTRY_TLD = {".co.uk": "UK", ".org.uk": "UK", ".uk": "UK", ".com.au": "AU",
 # AU excluded: Spam Act 2003 bans sending to harvested addresses.
 ALLOWED_COUNTRIES = {"US", "UK"}
 
+# A brand at or above this citation share is already winning its category -
+# the "you are invisible" pitch is false for them, so never draft it.
+PERFORMING_SHARE_PCT = 5.0
+
 
 def log(m):
     print(m, flush=True)
@@ -166,6 +170,21 @@ def derive_category(title, h1, meta):
     return " ".join(words[:3]) or "products"
 
 
+def derive_brand(title, domain):
+    """First title segment, but only if it reads like a name - else the domain root.
+
+    Titles such as "The San Francisco Bay Area's #1 Fitness Superstore" have no
+    delimiter, so segment[0] is the whole tagline. Falling back to the domain
+    root is always safe and is what the recipient calls themselves anyway.
+    """
+    root = domain.split(".")[0].replace("-", " ")
+    seg = re.split(r"[|\-–—:·]", title or "")[0].strip()
+    seg = re.sub(r"\s+", " ", seg)
+    if seg and len(seg) <= 32 and len(seg.split()) <= 4 and not seg.lower().startswith("the "):
+        return seg
+    return root.title()
+
+
 def check_schema(p):
     t = set(p["jsonld_types"])
     return {"has_product": bool(t & {"Product", "ProductGroup"}),
@@ -237,8 +256,10 @@ def render_audit_md(a):
     else:
         head = "**AI visibility unverified** for \"%s\" - no engine returned data." % a["category"]
     lines = ["# %s - AI Search Visibility" % a["brand"], "", head, "",
-             "When a shopper asks an AI assistant for the best %s, %s is not the answer. %s are." % (
-                 a["category"], a["brand"], cs),
+             ("When a shopper asks an AI assistant for the best %s, %s is not the answer. %s are."
+              % (a["category"], a["brand"], cs)) if (g or comps) else
+             ("We could not measure %s's AI citation share for \"%s\" - the checks below are from "
+              "your live pages." % (a["brand"], a["category"])),
              "", "**%s fix%s:**" % ({1: "One", 2: "Two", 3: "Three"}.get(len(fixes), len(fixes)),
                                     "" if len(fixes) == 1 else "es")]
     for i, f in enumerate(fixes, 1):
@@ -269,7 +290,7 @@ def cmd_audit(args):
 
     hp = parse_page(home.text)
     cat = args.category or derive_category(hp["title"], hp["h1"], hp["meta_description"])
-    brand = (re.split(r"[|\-–]", hp["title"])[0].strip() or domain)[:60]
+    brand = derive_brand(hp["title"], domain)
     schema = check_schema(hp)
 
     purl = find_product_url(domain, hp["soup"])
@@ -569,12 +590,19 @@ def compose(a, warm_ctx=None):
             stat += " %s gets %sx more citations than you do." % (g["peer"], g["peer_multiple"])
     elif eng:
         stat = "You were named by %d of %d AI engines. %s came up instead." % (named, len(eng), c1)
-    else:
+    elif not a["schema"]["has_product"]:
         stat = "Your store has no Product schema, so AI engines cannot read your catalogue."
-    return ("%s\n\n%s\n\nScreenshot attached.\n\nBiggest cause: %s\n\n"
+    elif not a["schema"]["has_faq"]:
+        stat = ("Your store has no FAQ schema - that is the format AI answers quote from "
+                "when shoppers ask about %s." % a["category"])
+    else:
+        return None  # No honest hook. Never invent a problem the audit did not find.
+    # Only promise a screenshot when one actually exists on disk.
+    shot = "Screenshot attached.\n\n" if a.get("screenshots") else ""
+    return ("%s\n\n%s\n\n%sBiggest cause: %s\n\n"
             "I do a full audit for $197, delivered in 24 hours - it shows every query you are "
             "missing and exactly what to change. Details: %s\n\nWorth a look?\n\nTrevor"
-            % (first, stat, fix, a.get("offer_url", "(pending)")))
+            % (first, stat, shot, fix, a.get("offer_url", "(pending)")))
 
 
 def cmd_draft(args):
@@ -585,13 +613,25 @@ def cmd_draft(args):
             if r.get("email"):
                 r["lane"] = "cold"
                 rows.append(r)
-    out = []
+    out, skipped = [], []
     for r in rows:
         ad = AUDITS / slug(r["domain"]) / "audit.json"
         if not ad.exists():
             continue
         a = json.loads(ad.read_text(encoding="utf-8"))
+        # Do not pitch "you are invisible" to a brand that is already winning -
+        # it is provably false to them and burns the prospect permanently.
+        g = a["ai_visibility"].get("citation_gap") or {}
+        if (g.get("own_share_pct") or 0) >= PERFORMING_SHARE_PCT:
+            log("  skip %s (already at %.1f%% citation share - pitch would be false)"
+                % (r["domain"], g["own_share_pct"]))
+            skipped.append((r["domain"], "performing"))
+            continue
         body = compose(a)
+        if body is None:
+            log("  skip %s (no honest hook - audit found no gap)" % r["domain"])
+            skipped.append((r["domain"], "no_gap"))
+            continue
         out.append({"recipient": r["email"], "domain": r["domain"], "lane": r["lane"],
                     "subject": "%s isn't showing up in AI search - here's the screenshot" % a["brand"],
                     "first_line": body.split("\n")[0], "body": body,
