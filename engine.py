@@ -632,8 +632,12 @@ def cmd_draft(args):
             log("  skip %s (no honest hook - audit found no gap)" % r["domain"])
             skipped.append((r["domain"], "no_gap"))
             continue
+        # Only promise a screenshot in the subject when one actually exists.
+        subj = ("%s isn't showing up in AI search - here's the screenshot" % a["brand"]
+                if a.get("screenshots") else
+                "%s isn't showing up in AI search - here are the numbers" % a["brand"])
         out.append({"recipient": r["email"], "domain": r["domain"], "lane": r["lane"],
-                    "subject": "%s isn't showing up in AI search - here's the screenshot" % a["brand"],
+                    "subject": subj,
                     "first_line": body.split("\n")[0], "body": body,
                     "words": wordcount(body),
                     "screenshot_dir": str(AUDITS / slug(r["domain"]) / "screenshots")})
