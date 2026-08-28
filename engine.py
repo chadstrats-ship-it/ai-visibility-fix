@@ -62,7 +62,7 @@ DIRECTORY_DOMAINS = {
 # National chains / franchise networks - real businesses, but not prospects for a
 # $197 local audit, and they distort the "local" lane.
 NATIONAL_CHAINS = {"airtron.com", "serviceexperts.com", "searsheatingcooling.com",
-                   "skinspirit.com", "portraitcare.com"}
+                   "skinspirit.com", "portraitcare.com", "nakedmd.com"}
 
 
 def is_directory(domain):
@@ -404,19 +404,34 @@ def cmd_audit(args):
         except Exception as e:
             log("    ! openrush parse: %s" % e)
 
+    # Assistant probes ("best <service> in <city>"). Unlike Google AI Overview,
+    # these DO name individual local businesses, so absence is the local proof.
+    probe = None
     px = load_mcp(d, "perplexity_ai_visibility")
     if px:
         engines["perplexity"] = {"checked": True,
                                  "brand_mentioned": bool(px.get("brand_mentioned")),
-                                 "source": "perplexity.api"}
+                                 "source": px.get("source", "perplexity.web")}
         comps += px.get("competitors_named") or []
+        probe = probe or {"query": px.get("query"), "city": px.get("city"),
+                          "service": px.get("service"), "named": []}
+        probe["named"] += px.get("competitors_named") or []
 
     cg = load_mcp(d, "chatgpt_ai_visibility")
     if cg:
         engines["chatgpt"] = {"checked": True,
                               "brand_mentioned": bool(cg.get("brand_mentioned")),
-                              "source": "chrome.manual"}
+                              "source": cg.get("source", "chatgpt.web")}
         comps += cg.get("competitors_named") or []
+        probe = probe or {"query": cg.get("query"), "city": cg.get("city"),
+                          "service": cg.get("service"), "named": []}
+        probe["named"] = (cg.get("competitors_named") or []) + probe["named"]
+
+    if probe:
+        named = [k for k in ("chatgpt", "perplexity")
+                 if engines[k]["checked"] and not engines[k]["brand_mentioned"]]
+        probe["absent_from"] = named
+        probe["engines_checked"] = [k for k in ("chatgpt", "perplexity") if engines[k]["checked"]]
 
     seen = set()
     comps = [c for c in comps if not (c.lower() in seen or seen.add(c.lower()))]
@@ -447,6 +462,7 @@ def cmd_audit(args):
              "engines": engines,
              "citation_gap": citation,
              "citation_table": citation_table,
+             "local_probe": probe,
              "competitors_named": comps,
              "engines_checked": sum(1 for v in engines.values() if v["checked"]),
              "engines_naming_brand": sum(1 for v in engines.values()
@@ -669,7 +685,33 @@ def enrich_file(f):
 
 # ---------------------------------------------------------------- draft
 
-def compose(a, warm_ctx=None):
+def compose(a, warm_ctx=None, lane="dtc"):
+    probe = a["ai_visibility"].get("local_probe")
+    if lane == "local":
+        # Google AI Overview does not fire on local-intent queries (it serves a
+        # map pack), so the local pitch rests entirely on the assistants.
+        if not probe or not probe.get("absent_from"):
+            return None
+        # Use the businesses the assistants actually named, not OpenRush domains.
+        comps = probe.get("named") or []
+        if not comps:
+            return None
+        engines = probe["absent_from"]
+        eng_txt = " and ".join(e.replace("chatgpt", "ChatGPT").replace("perplexity", "Perplexity")
+                               for e in engines)
+        where = probe.get("city") or "your area"
+        service = probe.get("service") or a["category"]
+        shot = "Screenshot attached.\n\n" if a.get("screenshots") else ""
+        subject_word = "Both" if len(probe.get("engines_checked") or engines) > 1 else "It"
+        return ("I asked %s for the best %s in %s.\n\n"
+                "%s answered with a named shortlist. %s wasn't on it. %s was.\n\n"
+                "%sThat shortlist is what people get now instead of scrolling. Being off it "
+                "costs you the call before you ever hear about it.\n\n"
+                "I do a full audit for $197, delivered in 24 hours - it shows every question "
+                "you're missing and what to change. Details: %s\n\nWorth a look?\n\nTrevor"
+                % (eng_txt, service, where, subject_word, a["brand"], comps[0], shot,
+                   a.get("offer_url", "(pending)")))
+
     eng = dict((k, v) for k, v in a["ai_visibility"]["engines"].items() if v.get("checked"))
     named = sum(1 for v in eng.values() if v.get("brand_mentioned"))
     comps = a["ai_visibility"]["competitors_named"]
@@ -723,15 +765,23 @@ def cmd_draft(args):
                 % (r["domain"], g["own_share_pct"]))
             skipped.append((r["domain"], "performing"))
             continue
-        body = compose(a)
+        body = compose(a, lane=r["lane"])
         if body is None:
             log("  skip %s (no honest hook - audit found no gap)" % r["domain"])
             skipped.append((r["domain"], "no_gap"))
             continue
         # Only promise a screenshot in the subject when one actually exists.
-        subj = ("%s isn't showing up in AI search - here's the screenshot" % a["brand"]
-                if a.get("screenshots") else
-                "%s isn't showing up in AI search - here are the numbers" % a["brand"])
+        if r["lane"] == "local":
+            pr = a["ai_visibility"].get("local_probe") or {}
+            named = pr.get("named") or []
+            svc = pr.get("service") or a["category"]
+            article = "an" if svc[:1].lower() in "aeiou" or svc[:1] in "HFLMNRSX" else "a"
+            subj = "When locals ask AI for %s %s, they hear %s" % (
+                article, svc, named[0] if named else "someone else")
+        elif a.get("screenshots"):
+            subj = "%s isn't showing up in AI search - here's the screenshot" % a["brand"]
+        else:
+            subj = "%s isn't showing up in AI search - here are the numbers" % a["brand"]
         out.append({"recipient": r["email"], "domain": r["domain"], "lane": r["lane"],
                     "subject": subj,
                     "first_line": body.split("\n")[0], "body": body,
