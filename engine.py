@@ -36,6 +36,43 @@ ALLOWED_COUNTRIES = {"US", "UK"}
 # the "you are invisible" pitch is false for them, so never draft it.
 PERFORMING_SHARE_PCT = 5.0
 
+# Public site the audit pages are published under.
+PUBLIC_BASE = "https://aivisibilityfix.co"
+
+# Aggregators, directories and publishers. They rank for local queries but are
+# not prospects - never let them into cold.csv.
+DIRECTORY_DOMAINS = {
+    "yelp.com", "yellowpages.com", "angi.com", "angieslist.com", "thumbtack.com",
+    "healthgrades.com", "zocdoc.com", "vitals.com", "webmd.com", "ada.org",
+    "bbb.org", "houzz.com", "homeadvisor.com", "porch.com", "networx.com",
+    "groupon.com", "tripadvisor.com", "facebook.com", "instagram.com",
+    "youtube.com", "reddit.com", "wikipedia.org", "amazon.com", "walmart.com",
+    "target.com", "mapquest.com", "google.com", "apple.com", "nextdoor.com",
+    "realself.com", "spafinder.com", "booksy.com", "vagaro.com", "opencare.com",
+    "carecredit.com", "1-800-dentist.com", "expertise.com", "birdeye.com",
+    "trustpilot.com", "indeed.com", "glassdoor.com", "linkedin.com", "yahoo.com",
+    # surfaced by the local discovery runs
+    "deltadental.com", "patientconnect365.com", "doctorsnetwork.com", "practo.com",
+    "webmd.com", "medicalspalocator.com", "threebestrated.com", "forbes.com",
+    "consumeraffairs.com", "homedepot.com", "lowes.com", "promptloop.com",
+    "bestbuy.com", "businessinsider.com", "petmd.com", "akc.org", "avma.org",
+    "dickssportinggoods.com", "academy.com", "chewy.com",
+}
+
+# National chains / franchise networks - real businesses, but not prospects for a
+# $197 local audit, and they distort the "local" lane.
+NATIONAL_CHAINS = {"airtron.com", "serviceexperts.com", "searsheatingcooling.com",
+                   "skinspirit.com", "portraitcare.com"}
+
+
+def is_directory(domain):
+    d = norm_domain(domain)
+    if d.endswith(".edu") or d.endswith(".gov") or d.endswith(".org"):
+        return True
+    if d in NATIONAL_CHAINS:
+        return True
+    return d in DIRECTORY_DOMAINS or any(d.endswith("." + x) for x in DIRECTORY_DOMAINS)
+
 
 def log(m):
     print(m, flush=True)
@@ -56,10 +93,14 @@ def norm_domain(d):
     return d.split("/")[0]
 
 
-def get(url, **kw):
+def get(url, _retry=True, **kw):
     try:
         return requests.get(url, headers=HDRS, timeout=TIMEOUT, allow_redirects=True, **kw)
     except Exception as e:
+        # Many small-business hosts only answer on the www host.
+        if _retry and "://www." not in url:
+            alt = re.sub(r"^(https?://)", r"\1www.", url, count=1)
+            return get(alt, _retry=False, **kw)
         log("    ! fetch failed %s: %s" % (url, type(e).__name__))
         return None
 
@@ -84,10 +125,13 @@ def country_of(domain, html):
         if domain.endswith(tld):
             return c
     h = (html or "")[:200000]
+    # Currency codes only. The bare word "Australia" appears in shipping lists and
+    # testimonials on US sites, and matching it dropped real US prospects
+    # (allamerican-NC = North Carolina, greatskinKC = Kansas City).
+    if re.search(r'"currency"\s*:\s*"AUD"', h) or re.search(r"\bAUD\s*\$", h):
+        return "AU"
     if re.search(r'"currency"\s*:\s*"GBP"', h) or re.search(r"£\s*\d", h):
         return "UK"
-    if re.search(r'"currency"\s*:\s*"AUD"', h) or re.search(r"Australia", h, re.I):
-        return "AU"
     return "US"
 
 
@@ -178,10 +222,27 @@ def derive_brand(title, domain):
     root is always safe and is what the recipient calls themselves anyway.
     """
     root = domain.split(".")[0].replace("-", " ")
-    seg = re.split(r"[|\-–—:·]", title or "")[0].strip()
-    seg = re.sub(r"\s+", " ", seg)
-    if seg and len(seg) <= 32 and len(seg.split()) <= 4 and not seg.lower().startswith("the "):
-        return seg
+    # Titles are often "<service> in <city> | <Brand>", so score every segment
+    # instead of blindly taking the first.
+    descriptive = re.compile(
+        r"\b(in|near|serving|best|top|official|home|welcome|your|we|the)\b|,", re.I)
+    best, best_score = None, -1
+    for seg in re.split(r"[|\-–—:·]", title or ""):
+        seg = re.sub(r"\s+", " ", seg).strip()
+        if not seg or len(seg) > 32 or len(seg.split()) > 4:
+            continue
+        score = 0
+        if not descriptive.search(seg):
+            score += 3
+        # A segment sharing the domain root is almost certainly the brand.
+        if re.sub(r"[^a-z]", "", seg.lower())[:6] in re.sub(r"[^a-z]", "", root.lower()):
+            score += 4
+        if seg.istitle() or seg.isupper():
+            score += 1
+        if score > best_score:
+            best, best_score = seg, score
+    if best and best_score >= 3:
+        return best
     return root.title()
 
 
@@ -313,10 +374,12 @@ def cmd_audit(args):
     comps = []
 
     citation = None
+    citation_table = []
     orx = load_mcp(d, "openrush_ai_visibility")
     if orx:
         try:
             ms = (orx.get("data") or {}).get("mentions") or []
+            citation_table = sorted(ms, key=lambda m: m.get("rank") or 99)
             mine = next((m for m in ms if norm_domain(m.get("domain", "")) == domain), None)
             others = sorted([m for m in ms if m is not mine],
                             key=lambda m: m.get("mentions") or 0, reverse=True)
@@ -388,6 +451,7 @@ def cmd_audit(args):
          "ai_visibility": {
              "engines": engines,
              "citation_gap": citation,
+             "citation_table": citation_table,
              "competitors_named": comps,
              "engines_checked": sum(1 for v in engines.values() if v["checked"]),
              "engines_naming_brand": sum(1 for v in engines.values()
@@ -428,29 +492,37 @@ def apify_discover(n, token):
 def cmd_discover(args):
     load_env()
     token = os.environ.get("APIFY_TOKEN", "").strip()
-    out = DATA / "cold.csv"
-    log("[discover] target n=%d apify_token=%s" % (
-        args.n, "present" if token else "MISSING -> fallback"))
+    out = DATA / ("local.csv" if args.niche == "local" else "cold.csv")
+    log("[discover] niche=%s target n=%d apify_token=%s" % (
+        args.niche, args.n, "present" if token else "MISSING -> fallback"))
     if args.dry_run:
         log("  DRY-RUN would write %s" % out)
         return 0
 
+    local = (args.niche == "local")
+    seed_file = RAW / ("seed_local.json" if local else "seed_domains.json")
+
     cands = []
-    if token:
+    if token and not local:
         try:
             cands = apify_discover(args.n, token)
         except Exception as e:
             log("  ! apify failed: %s %s; using fallback" % (type(e).__name__, e))
     if not cands:
-        seeds = RAW / "seed_domains.json"
-        if not seeds.exists():
-            log("  ! no %s. Populate via OpenRush discover_competitors, or set APIFY_TOKEN." % seeds)
+        if not seed_file.exists():
+            log("  ! no %s. Populate via OpenRush discover_competitors." % seed_file)
             return 1
-        blob = json.loads(seeds.read_text(encoding="utf-8"))
+        blob = json.loads(seed_file.read_text(encoding="utf-8"))
         for cat, ds in blob.items():
             for dd in ds:
                 cands.append({"domain": norm_domain(dd), "category": cat,
                               "source": "openrush.discover_competitors"})
+
+    # Merge with what is already on disk so re-running never destroys enrichment.
+    existing = {}
+    if out.exists():
+        for r in csv.DictReader(out.open(encoding="utf-8")):
+            existing[r["domain"]] = r
 
     seen, rows = set(), []
     for c in cands:
@@ -458,11 +530,24 @@ def cmd_discover(args):
         if dom in seen:
             continue
         seen.add(dom)
-        ok, sig = is_shopify(dom)
-        if not ok:
-            log("  skip %s (not shopify)" % dom)
+        if dom in existing:
+            rows.append(existing[dom])
             continue
-        h = get("https://%s/" % dom)
+        if is_directory(dom):
+            log("  skip %s (directory/aggregator, not a prospect)" % dom)
+            continue
+        if local:
+            h = get("https://%s/" % dom)
+            if h is None or h.status_code >= 400:
+                log("  skip %s (unreachable)" % dom)
+                continue
+            sig = "local_business"
+        else:
+            ok, sig = is_shopify(dom)
+            if not ok:
+                log("  skip %s (not shopify)" % dom)
+                continue
+            h = get("https://%s/" % dom)
         country = country_of(dom, h.text if h else "")
         if country not in ALLOWED_COUNTRIES:
             log("  skip %s (country=%s excluded)" % (dom, country))
@@ -478,7 +563,8 @@ def cmd_discover(args):
                                           "country", "source", "email", "email_source"])
         w.writeheader()
         w.writerows(rows)
-    log("  -> %s rows=%d" % (out, len(rows)))
+    kept = sum(1 for r in rows if r["domain"] in existing)
+    log("  -> %s rows=%d (new=%d kept=%d)" % (out, len(rows), len(rows) - kept, kept))
     return 0
 
 
@@ -521,18 +607,31 @@ def emails_from(html, domain):
 
 
 def cmd_enrich(args):
-    f = DATA / "cold.csv"
-    if not f.exists():
-        log("  ! %s missing - run discover first" % f)
+    files = [DATA / "cold.csv", DATA / "local.csv"]
+    files = [f for f in files if f.exists()]
+    if not files:
+        log("  ! no cold.csv/local.csv - run discover first")
         return 1
-    rows = list(csv.DictReader(f.open(encoding="utf-8")))
-    log("[enrich] rows=%d" % len(rows))
     if args.dry_run:
-        log("  DRY-RUN no writes")
+        for f in files:
+            n = len(list(csv.DictReader(f.open(encoding="utf-8"))))
+            log("[enrich] DRY-RUN %s rows=%d, no writes" % (f.name, n))
         return 0
+    total_hits = total_rows = 0
+    for f in files:
+        h, n = enrich_file(f)
+        total_hits += h
+        total_rows += n
+    log("  == overall hit rate %d/%d = %d%%"
+        % (total_hits, total_rows, round(100 * total_hits / max(total_rows, 1))))
+    return 0
+
+
+def enrich_file(f):
+    rows = list(csv.DictReader(f.open(encoding="utf-8")))
+    log("[enrich] %s rows=%d" % (f.name, len(rows)))
     if not rows:
-        log("  nothing to enrich")
-        return 0
+        return 0, 0
 
     hits = 0
     for r in rows:
@@ -568,8 +667,9 @@ def cmd_enrich(args):
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
-    log("  -> hit rate %d/%d = %d%%" % (hits, len(rows), round(100 * hits / max(len(rows), 1))))
-    return 0
+    log("  -> %s hit rate %d/%d = %d%%"
+        % (f.name, hits, len(rows), round(100 * hits / max(len(rows), 1))))
+    return hits, len(rows)
 
 
 # ---------------------------------------------------------------- draft
@@ -607,11 +707,12 @@ def compose(a, warm_ctx=None):
 
 def cmd_draft(args):
     rows = []
-    cf = DATA / "cold.csv"
-    if cf.exists():
+    for cf, lane in ((DATA / "cold.csv", "dtc"), (DATA / "local.csv", "local")):
+        if not cf.exists():
+            continue
         for r in csv.DictReader(cf.open(encoding="utf-8")):
             if r.get("email"):
-                r["lane"] = "cold"
+                r["lane"] = lane
                 rows.append(r)
     out, skipped = [], []
     for r in rows:
@@ -696,6 +797,163 @@ def cmd_followup(args):
     return 0
 
 
+# ---------------------------------------------------------------- export
+
+# Role/shared inboxes - there is no person behind them, so first_name stays
+# blank rather than greeting a business "Hi Info,".
+ROLE_LOCALPARTS = {"info", "sales", "contact", "hello", "hi", "support", "admin",
+                   "team", "orders", "help", "office", "mail", "enquiries",
+                   "inquiries", "service", "customerservice", "care", "shop",
+                   "bark", "woof", "reception", "frontdesk", "appointments",
+                   "booking", "bookings", "schedule", "newpatients", "smile"}
+
+
+def first_name_from(email):
+    """Only return a name we can actually justify. Never invent one."""
+    lp = (email or "").partition("@")[0].lower()
+    lp = re.sub(r"[0-9]+$", "", lp)
+    if "." in lp:
+        cand = lp.split(".")[0]
+    elif "_" in lp:
+        cand = lp.split("_")[0]
+    else:
+        cand = lp
+    if cand in ROLE_LOCALPARTS or len(cand) < 3 or not cand.isalpha():
+        return ""
+    # A bare single token is only a name if it is not a role word; a dotted
+    # local part (john.smith) is strong evidence, a bare one is weak.
+    if "." not in lp and "_" not in lp:
+        return ""
+    return cand.capitalize()
+
+
+AUDIT_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{brand} - AI Search Visibility Audit</title>
+<style>
+:root{{--bg:#fff;--fg:#0f1115;--muted:#5b6270;--line:#e4e7ec;--card:#f7f8fa;--accent:#1a5cff;--warn:#b42318}}
+@media(prefers-color-scheme:dark){{:root:not([data-theme="light"]){{--bg:#0f1115;--fg:#f2f4f7;--muted:#98a2b3;--line:#252a33;--card:#171a21;--accent:#5b8cff;--warn:#ff6b5e}}}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--fg);
+font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
+.wrap{{max-width:720px;margin:0 auto;padding:56px 20px 72px}}
+h1{{font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:0 0 6px;line-height:1.15}}
+.dom{{color:var(--muted);margin:0 0 26px;font-size:15px}}
+.stat{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:0 0 26px}}
+.big{{font-size:clamp(26px,5vw,38px);font-weight:700;color:var(--warn);letter-spacing:-.02em;
+font-variant-numeric:tabular-nums;line-height:1.1}}
+.stat p{{margin:8px 0 0;color:var(--muted);font-size:15px}}
+table{{width:100%;border-collapse:collapse;margin:0 0 26px;font-size:15px}}
+th,td{{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}}
+th{{color:var(--muted);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.04em}}
+td.num{{text-align:right;font-variant-numeric:tabular-nums}}
+tr.you td{{font-weight:700;color:var(--warn)}}
+img{{max-width:100%;border:1px solid var(--line);border-radius:10px;display:block;margin:0 0 8px}}
+figcaption{{color:var(--muted);font-size:13px;margin:0 0 26px}}
+ol{{padding-left:20px}}ol li{{margin-bottom:9px}}
+.cta{{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;
+padding:13px 20px;border-radius:8px;font-weight:650;margin-top:8px}}
+footer{{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}}
+</style></head><body><div class="wrap">
+<h1>{brand}: AI search visibility</h1>
+<p class="dom">{domain} &middot; measured {date}</p>
+{stat_block}
+{table_block}
+{shot_block}
+<h2>What to fix</h2>
+<ol>{fixes}</ol>
+<a class="cta" href="{base}/">See the $197 audit &rarr;</a>
+<footer>Measured by 322 Media LLC. Citation share is a sampled observation of Google AI Overview
+for this category, measured against the named competitor domains above. AI answers are
+non-deterministic; treat movement as directional. No ranking or citation count is guaranteed.</footer>
+</div></body></html>
+"""
+
+
+def build_audit_page(a, has_shot):
+    g = a["ai_visibility"].get("citation_gap") or {}
+    if g.get("own_share_pct") is not None:
+        stat = ('<div class="stat"><div class="big">{p:.3f}%</div><p>Share of AI-answer citations '
+                'you earn for "{c}" - rank {r} of {n}. {L} takes {ls:.1f}%.</p></div>').format(
+            p=g["own_share_pct"], c=a["category"], r=g["own_rank"], n=g["set_size"],
+            L=g["leader"], ls=g["leader_share_pct"])
+        rows = ""
+        for m in (a["ai_visibility"].get("citation_table") or []):
+            you = ' class="you"' if norm_domain(m["domain"]) == a["domain"] else ""
+            rows += '<tr{y}><td>{d}</td><td class="num">{s:.2f}%</td><td class="num">{k}</td></tr>'.format(
+                y=you, d=m["domain"], s=100 * (m.get("share_within_set") or 0), k=m.get("rank"))
+        table = ("<table><tr><th>Domain</th><th>Share of citations</th><th>Rank</th></tr>%s</table>"
+                 % rows) if rows else ""
+    else:
+        stat = ('<div class="stat"><p>AI citation share could not be measured for "%s". '
+                'The findings below come from your live pages.</p></div>' % a["category"])
+        table = ""
+    shot = ""
+    if has_shot:
+        shot = ('<figure><img src="proof.jpg" alt="AI answer for this category">'
+                '<figcaption>The AI answer for this category. Your brand is not in it.</figcaption></figure>')
+    fixes = "".join("<li>%s</li>" % f for f in a["recommended_fixes"][:4])
+    return AUDIT_PAGE.format(brand=a["brand"], domain=a["domain"], date=a["checked_at"][:10],
+                             stat_block=stat, table_block=table, shot_block=shot,
+                             fixes=fixes, base=PUBLIC_BASE)
+
+
+def cmd_export(args):
+    df = DATA / "drafts.csv"
+    if not df.exists():
+        log("  ! no drafts.csv - run draft first")
+        return 1
+    drafts = list(csv.DictReader(df.open(encoding="utf-8")))
+    outdir = ROOT / "docs" / "a"
+    out_csv = DATA / "instantly.csv"
+    log("[export] drafts=%d" % len(drafts))
+    if args.dry_run:
+        log("  DRY-RUN would publish %d pages under docs/a/ and write %s" % (len(drafts), out_csv))
+        return 0
+
+    outdir.mkdir(parents=True, exist_ok=True)
+    rows, no_name = [], 0
+    for d in drafts:
+        dom = d["domain"]
+        ad = AUDITS / slug(dom) / "audit.json"
+        if not ad.exists():
+            continue
+        a = json.loads(ad.read_text(encoding="utf-8"))
+        pdir = outdir / slug(dom)
+        pdir.mkdir(parents=True, exist_ok=True)
+
+        shots = sorted((AUDITS / slug(dom) / "screenshots").glob("*.jpg"))
+        has_shot = bool(shots)
+        if has_shot:
+            (pdir / "proof.jpg").write_bytes(shots[0].read_bytes())
+        (pdir / "index.html").write_text(build_audit_page(a, has_shot), encoding="utf-8")
+
+        comps = a["ai_visibility"]["competitors_named"]
+        g = a["ai_visibility"].get("citation_gap") or {}
+        competitor = g.get("peer") or (comps[0] if comps else "")
+        fn = first_name_from(d["recipient"])
+        if not fn:
+            no_name += 1
+        rows.append({
+            "email": d["recipient"],
+            "first_name": fn,
+            "brand": a["brand"],
+            "competitor_named": competitor,
+            "screenshot_url": ("%s/a/%s/proof.jpg" % (PUBLIC_BASE, slug(dom))) if has_shot else "",
+            "audit_url": "%s/a/%s/" % (PUBLIC_BASE, slug(dom)),
+        })
+
+    with out_csv.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["email", "first_name", "brand",
+                                           "competitor_named", "screenshot_url", "audit_url"])
+        w.writeheader()
+        w.writerows(rows)
+    with_shot = sum(1 for r in rows if r["screenshot_url"])
+    log("  -> %s rows=%d | with screenshot=%d | blank first_name=%d (role inboxes)"
+        % (out_csv, len(rows), with_shot, no_name))
+    return 0
+
+
 # ------------------------------------------------------------------ main
 
 def main():
@@ -709,8 +967,10 @@ def main():
     a.add_argument("--category", default=None)
     a.set_defaults(fn=cmd_audit)
 
-    d = sub.add_parser("discover", help="build data/cold.csv")
+    d = sub.add_parser("discover", help="build data/cold.csv (dtc) or data/local.csv (local)")
     d.add_argument("--n", type=int, default=200)
+    d.add_argument("--niche", choices=["dtc", "local"], default="dtc",
+                   help="dtc = Shopify DTC stores; local = local service businesses")
     d.set_defaults(fn=cmd_discover)
 
     e = sub.add_parser("enrich", help="find published emails")
@@ -721,6 +981,9 @@ def main():
 
     f = sub.add_parser("followup", help="3-day bumps")
     f.set_defaults(fn=cmd_followup)
+
+    x = sub.add_parser("export", help="publish audit pages + write Instantly CSV")
+    x.set_defaults(fn=cmd_export)
 
     args = p.parse_args()
     sys.exit(args.fn(args))

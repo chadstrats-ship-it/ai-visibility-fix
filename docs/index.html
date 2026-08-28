@@ -49,9 +49,12 @@
   .buy{margin-top:auto;display:block;text-align:center;background:var(--accent);color:var(--accent-fg);
     text-decoration:none;padding:12px 16px;border-radius:8px;font-weight:650;font-size:15px}
   .buy[aria-disabled="true"]{background:var(--line);color:var(--muted);pointer-events:none}
-  .shots{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
-  .shot{border:1px dashed var(--line);border-radius:10px;aspect-ratio:4/3;display:grid;place-items:center;
-    color:var(--muted);font-size:13px;text-align:center;padding:14px;background:var(--card)}
+  .lede{color:var(--muted);margin:-6px 0 22px;max-width:68ch}
+  .shots{display:grid;gap:22px;grid-template-columns:1fr}
+  .shot{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+  .shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+  .shot figcaption{color:var(--muted);font-size:13.5px;padding:12px 14px}
+  .shot figcaption b{color:var(--fg)}
   footer{padding:36px 0 64px;color:var(--muted);font-size:13.5px;border-top:1px solid var(--line)}
   footer p{margin:0 0 10px}
   footer a{color:var(--accent)}
@@ -131,11 +134,26 @@
   </section>
 
   <section>
-    <h2>Before &amp; after</h2>
+    <h2>What the proof looks like</h2>
+    <p class="lede">Three real Google AI Overviews we captured while auditing stores in these
+    categories. Brand and publisher names are redacted. In every one, the AI answer recommends a
+    short list — and the stores we were auditing are not on it.</p>
     <div class="shots">
-      <div class="shot">Audit screenshot 1<br>(citation-share table)</div>
-      <div class="shot">Audit screenshot 2<br>(AI answer, competitor cited)</div>
-      <div class="shot">Audit screenshot 3<br>(after re-measurement)</div>
+      <figure class="shot">
+        <img src="proof/pet.jpg" alt="Google AI Overview for a pet supplements query, brand names redacted" loading="lazy">
+        <figcaption><b>Pet supplements.</b> The answer names two national brands and cites a
+        marketplace and a vet publisher. The DTC store we audited earns 0.010% of citations here.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="proof/linen.jpg" alt="Google AI Overview for a linen sheets query, brand names redacted" loading="lazy">
+        <figcaption><b>Linen sheets.</b> One brand is named “best overall”. Four of the stores we
+        measured in this category are absent — one of them earns 0.08% of citations.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="proof/gym.jpg" alt="Google AI Overview for a home gym equipment query, publisher names redacted" loading="lazy">
+        <figcaption><b>Home gym equipment.</b> A review publisher outranks every retailer on the
+        page and feeds the AI answer. The retailers are sources, not the recommendation.</figcaption>
+      </figure>
     </div>
   </section>
 
