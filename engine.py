@@ -226,24 +226,19 @@ def derive_brand(title, domain):
     # instead of blindly taking the first.
     descriptive = re.compile(
         r"\b(in|near|serving|best|top|official|home|welcome|your|we|the)\b|,", re.I)
-    best, best_score = None, -1
+    stem = re.sub(r"[^a-z]", "", root.lower())[:4]
     for seg in re.split(r"[|\-–—:·]", title or ""):
         seg = re.sub(r"\s+", " ", seg).strip()
         if not seg or len(seg) > 32 or len(seg.split()) > 4:
             continue
-        score = 0
-        if not descriptive.search(seg):
-            score += 3
-        # A segment sharing the domain root is almost certainly the brand.
-        if re.sub(r"[^a-z]", "", seg.lower())[:6] in re.sub(r"[^a-z]", "", root.lower()):
-            score += 4
-        if seg.istitle() or seg.isupper():
-            score += 1
-        if score > best_score:
-            best, best_score = seg, score
-    if best and best_score >= 3:
-        return best
-    return root.title()
+        if descriptive.search(seg):
+            continue
+        # The segment must actually share the domain stem, otherwise it is a
+        # product category or a button label ("Duvet Covers", "Book Now"),
+        # not the brand.
+        if stem and stem in re.sub(r"[^a-z]", "", seg.lower()):
+            return seg
+    return " ".join(w.capitalize() for w in root.split())
 
 
 def check_schema(p):
