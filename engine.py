@@ -122,10 +122,11 @@ _OWN = None
 
 
 def own_prospects():
-    """Domains already on our own outreach list.
+    """Domains we will actually email.
 
-    Never name one prospect as the competitor beating another - we would be
-    emailing both sides of the same comparison.
+    Never name one of them as the competitor beating another - we would be
+    sending both sides of the same comparison. Discovery seeds from competitor
+    sets, so un-emailed peers in the same set are still fair to name.
     """
     global _OWN
     if _OWN is None:
@@ -133,7 +134,8 @@ def own_prospects():
         for f in (DATA / "cold.csv", DATA / "local.csv"):
             if f.exists():
                 for r in csv.DictReader(f.open(encoding="utf-8")):
-                    _OWN.add(norm_domain(r["domain"]))
+                    if r.get("email"):
+                        _OWN.add(norm_domain(r["domain"]))
     return _OWN
 
 
