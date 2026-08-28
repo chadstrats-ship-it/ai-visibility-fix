@@ -118,6 +118,25 @@ def wordcount(s):
     return len(re.findall(r"\S+", s))
 
 
+_OWN = None
+
+
+def own_prospects():
+    """Domains already on our own outreach list.
+
+    Never name one prospect as the competitor beating another - we would be
+    emailing both sides of the same comparison.
+    """
+    global _OWN
+    if _OWN is None:
+        _OWN = set()
+        for f in (DATA / "cold.csv", DATA / "local.csv"):
+            if f.exists():
+                for r in csv.DictReader(f.open(encoding="utf-8")):
+                    _OWN.add(norm_domain(r["domain"]))
+    return _OWN
+
+
 # ---------------------------------------------------------------- audit
 
 def country_of(domain, html):
@@ -388,9 +407,12 @@ def cmd_audit(args):
                     "rank": mine.get("rank"),
                     "set_size": len(ms),
                     "source": "openrush.inspect_ai_visibility"}
-                # Nearest peer above us = the most persuasive comparison in the email.
-                peer = min((o for o in others if (o.get("mentions") or 0) > (mine.get("mentions") or 0)),
-                           key=lambda o: o.get("mentions") or 0, default=None)
+                # Nearest peer above us = the most persuasive comparison, but never
+                # another prospect we are also emailing.
+                above = [o for o in others
+                         if (o.get("mentions") or 0) > (mine.get("mentions") or 0)]
+                ext = [o for o in above if norm_domain(o.get("domain", "")) not in own_prospects()]
+                peer = min(ext or above, key=lambda o: o.get("mentions") or 0, default=None)
                 citation = {
                     "own_mentions": mine.get("mentions"),
                     "own_share_pct": round(100 * (mine.get("share_within_set") or 0), 3),
