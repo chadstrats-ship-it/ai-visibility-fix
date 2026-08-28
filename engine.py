@@ -737,10 +737,10 @@ def compose(a, warm_ctx=None, lane="dtc"):
                 "%s answered with a named shortlist. %s wasn't on it. %s was.\n\n"
                 "%sThat shortlist is what people get now instead of scrolling. Being off it "
                 "costs you the call before you ever hear about it.\n\n"
-                "I do a full audit for $197, delivered in 24 hours - it shows every question "
-                "you're missing and what to change. Details: %s\n\nWorth a look?\n\nTrevor"
-                % (eng_txt, service, where, subject_word, a["brand"], comps[0], shot,
-                   a.get("offer_url", "(pending)")))
+                "I do the full shortlist audit for $497, delivered in 48 hours - transcripts, who "
+                "gets named instead, and what's keeping you off. Details: %s/local/"
+                "\n\nWorth a look?\n\nTrevor"
+                % (eng_txt, service, where, subject_word, a["brand"], comps[0], shot, PUBLIC_BASE))
 
     eng = dict((k, v) for k, v in a["ai_visibility"]["engines"].items() if v.get("checked"))
     named = sum(1 for v in eng.values() if v.get("brand_mentioned"))
