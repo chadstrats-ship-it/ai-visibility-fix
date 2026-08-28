@@ -47,5 +47,38 @@
       "fix": "https://buy.stripe.com/eVq9AU9bk2RG8C72Ey5Ne02",
       "overhaul": "https://buy.stripe.com/4gM14o2MWdwkg4zbb45Ne03"
     }
-  }
+  },
+  "local_offers": {
+    "local_audit": {
+      "name": "Shortlist Audit",
+      "price_usd": 497,
+      "unit_amount": 49700,
+      "delivery": "48 hours",
+      "product": "prod_V9h8xvYMKicmMc",
+      "price": "price_1U9Nk0LpItqfVyEmFWlUuCEZ",
+      "payment_link": "plink_1U9NkSLpItqfVyEmfNoPEVvK",
+      "url": "https://buy.stripe.com/dRm7sMbfk8ArgIT52f7Re03"
+    },
+    "local_fix": {
+      "name": "Shortlist Fix",
+      "price_usd": 1497,
+      "unit_amount": 149700,
+      "delivery": "14 days",
+      "product": "prod_V9h8Nr0QAVsXgs",
+      "price": "price_1U9NkALpItqfVyEmQU9mLFPp",
+      "payment_link": "plink_1U9NkcLpItqfVyEmkFfDAKbx",
+      "url": "https://buy.stripe.com/7sY6oI2IOcQH1NZcuH7Re04"
+    },
+    "local_overhaul": {
+      "name": "Full Local Overhaul",
+      "price_usd": 2500,
+      "unit_amount": 250000,
+      "delivery": "30 days",
+      "product": "prod_V9h8wBgD2w4YdI",
+      "price": "price_1U9NkILpItqfVyEmb2ZOyHth",
+      "payment_link": "plink_1U9NkkLpItqfVyEmqJuvcRrW",
+      "url": "https://buy.stripe.com/dRmfZifvA6sjgITamz7Re05"
+    }
+  },
+  "local_page": "https://aivisibilityfix.co/local/"
 }

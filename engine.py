@@ -57,6 +57,12 @@ DIRECTORY_DOMAINS = {
     "consumeraffairs.com", "homedepot.com", "lowes.com", "promptloop.com",
     "bestbuy.com", "businessinsider.com", "petmd.com", "akc.org", "avma.org",
     "dickssportinggoods.com", "academy.com", "chewy.com",
+    # publishers/retailers surfaced by kitchen + outdoor runs
+    "seriouseats.com", "bonappetit.com", "foodnetwork.com", "foodandwine.com",
+    "fredmeyer.com", "costco.com", "rei.com", "thebigoutside.com",
+    "outdoorgearlab.com", "cleverhiker.com", "backpacker.com", "nytimes.com",
+    "thegoodtrade.com", "consumerreports.org", "nymag.com", "vogue.com",
+    "allure.com", "byrdie.com", "healthline.com", "garagegymreviews.com",
 }
 
 # National chains / franchise networks - real businesses, but not prospects for a
@@ -1014,11 +1020,12 @@ def cmd_export(args):
             "competitor_named": competitor,
             "screenshot_url": ("%s/a/%s/proof.jpg" % (PUBLIC_BASE, slug(dom))) if has_shot else "",
             "audit_url": "%s/a/%s/" % (PUBLIC_BASE, slug(dom)),
+            "offer_url": ("%s/local/" % PUBLIC_BASE) if d["lane"] == "local" else ("%s/" % PUBLIC_BASE),
         })
 
     with out_csv.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=["email", "first_name", "brand",
-                                           "competitor_named", "screenshot_url", "audit_url"])
+        w = csv.DictWriter(fh, fieldnames=["email", "first_name", "brand", "competitor_named",
+                                           "screenshot_url", "audit_url", "offer_url"])
         w.writeheader()
         w.writerows(rows)
     with_shot = sum(1 for r in rows if r["screenshot_url"])

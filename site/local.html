@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get on AI's shortlist — local AI visibility for service businesses</title>
+<meta name="description" content="When people ask ChatGPT or Perplexity for the best dentist, HVAC company or med spa in your city, they get a shortlist of named businesses. We find out whether you're on it, then get you on it.">
+<style>
+  :root{
+    --bg:#ffffff; --fg:#0f1115; --muted:#5b6270; --line:#e4e7ec;
+    --card:#f7f8fa; --accent:#1a5cff; --accent-fg:#ffffff; --warn:#b42318;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1115; --fg:#f2f4f7; --muted:#98a2b3; --line:#252a33;
+      --card:#171a21; --accent:#5b8cff; --accent-fg:#0b0d11; --warn:#ff6b5e;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:0 20px}
+  header{padding:72px 0 40px}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px}
+  h1{font-size:clamp(30px,5.2vw,46px);line-height:1.12;letter-spacing:-.022em;margin:0 0 18px;font-weight:700}
+  .sub{font-size:clamp(17px,2.2vw,20px);color:var(--muted);margin:0;max-width:60ch}
+  h2{font-size:22px;letter-spacing:-.01em;margin:0 0 18px;font-weight:650}
+  section{padding:40px 0;border-top:1px solid var(--line)}
+  .lede{color:var(--muted);margin:-6px 0 22px;max-width:68ch}
+  .how{display:grid;gap:12px;margin:0;padding:0;list-style:none;counter-reset:s}
+  .how li{counter-increment:s;padding-left:38px;position:relative;color:var(--muted)}
+  .how li::before{content:counter(s);position:absolute;left:0;top:1px;width:24px;height:24px;
+    border-radius:50%;background:var(--accent);color:var(--accent-fg);
+    display:grid;place-items:center;font-size:13px;font-weight:700}
+  .how b{color:var(--fg);font-weight:600}
+  .proof{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:22px 0 0}
+  .proof .stat{font-size:clamp(22px,3.4vw,30px);font-weight:700;letter-spacing:-.02em;color:var(--warn);
+    line-height:1.2}
+  .proof p{margin:8px 0 0;color:var(--muted);font-size:15px}
+  .shots{display:grid;gap:22px;grid-template-columns:1fr}
+  .shot{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+  .shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+  .shot figcaption{color:var(--muted);font-size:13.5px;padding:12px 14px}
+  .shot figcaption b{color:var(--fg)}
+  .tiers{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .tier{border:1px solid var(--line);border-radius:12px;padding:22px;background:var(--card);
+    display:flex;flex-direction:column}
+  .tier.feat{border-color:var(--accent);border-width:2px}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .tier h3{margin:0 0 4px;font-size:17px;font-weight:650}
+  .price{font-size:32px;font-weight:700;letter-spacing:-.02em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+  .turn{font-size:13px;color:var(--muted);margin:0 0 14px}
+  .tier ul{margin:0 0 20px;padding-left:18px;color:var(--muted);font-size:14.5px}
+  .tier ul li{margin-bottom:5px}
+  .buy{margin-top:auto;display:block;text-align:center;background:var(--accent);color:var(--accent-fg);
+    text-decoration:none;padding:12px 16px;border-radius:8px;font-weight:650;font-size:15px}
+  footer{padding:36px 0 64px;color:var(--muted);font-size:13.5px;border-top:1px solid var(--line)}
+  footer p{margin:0 0 10px}
+  footer a{color:var(--accent)}
+  footer .legal-name{color:var(--fg);font-size:15px}
+  footer .policy{color:var(--fg)}
+  footer .addr{font-style:normal;line-height:1.5}
+  footer .fine{font-size:12.5px;opacity:.8;margin-top:16px}
+  .back{display:inline-block;margin-top:6px;color:var(--accent);text-decoration:none;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="kicker">For dentists, HVAC, med spas and other local services</p>
+    <h1>Get on AI's shortlist.</h1>
+    <p class="sub">Ask ChatGPT or Perplexity for the best dentist in your city and you don't get ten
+    blue links. You get a shortlist of named practices, with ratings and review counts. Your
+    customers are already asking. The only question is whether your name comes back.</p>
+
+    <div class="proof">
+      <div class="stat">0 of 4 answers named the businesses we audited</div>
+      <p>We asked ChatGPT and Perplexity for the best dentist, HVAC company and med spa across three
+      US cities. Every answer returned a named shortlist. None of the businesses we were auditing
+      appeared in any of them — including one practice in the very neighbourhood the assistant named
+      two competitors from.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>What the shortlist looks like</h2>
+    <p class="lede">Three real assistant answers we captured. Business and publisher names are
+    redacted. What matters is the shape: a specific, ranked list of named providers — and how short
+    it is.</p>
+    <div class="shots">
+      <figure class="shot">
+        <img src="/proof/loc_dentist.jpg" alt="Assistant answer listing named dental practices, names redacted" loading="lazy">
+        <figcaption><b>Dentist, Nashville.</b> Five named practices with ratings, review counts and a
+        map. Two of them sit in the same neighbourhood as the practice we were auditing. It wasn't listed.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="/proof/loc_hvac.jpg" alt="Assistant answer listing named HVAC companies, names redacted" loading="lazy">
+        <figcaption><b>HVAC, Charlotte.</b> A ranked five-company shortlist with a "best overall" pick,
+        citing review aggregators. Two large local contractors we audited are absent from it entirely.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="/proof/loc_medspa.jpg" alt="Assistant answer listing named med spas, names redacted" loading="lazy">
+        <figcaption><b>Med spa, Austin.</b> Five named spas, each with a reason to pick it. The two
+        Austin med spas we measured don't appear.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <ol class="how">
+      <li><b>We ask.</b> We put the real buying question — "best {service} in {your city}" — to ChatGPT and Perplexity, and record verbatim who they name.</li>
+      <li><b>You get the proof.</b> The transcript, the shortlist you're missing from, and the specific reasons you're not on it.</li>
+      <li><b>We fix it.</b> Entity consistency, review-platform presence, NAP and citation consistency across the directories assistants actually read, and the service and FAQ pages that answer what people ask.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Pricing</h2>
+    <div class="tiers">
+      <div class="tier">
+        <h3>Shortlist Audit</h3>
+        <div class="price">$497</div>
+        <p class="turn">Delivered in 48 hours</p>
+        <ul>
+          <li>ChatGPT + Perplexity transcripts</li>
+          <li>Who gets named instead</li>
+          <li>Entity &amp; NAP gap list</li>
+          <li>Prioritised fix plan</li>
+        </ul>
+        <a class="buy" id="buy-local-audit" data-sku="local_audit" href="https://buy.stripe.com/dRm7sMbfk8ArgIT52f7Re03">Get the audit — $497</a>
+      </div>
+      <div class="tier feat">
+        <div class="tag">Most popular</div>
+        <h3>Shortlist Fix</h3>
+        <div class="price">$1,497</div>
+        <p class="turn">14 days</p>
+        <ul>
+          <li>Everything in Audit</li>
+          <li>Entity consistency corrected</li>
+          <li>Review-platform profiles</li>
+          <li>NAP/citation cleanup</li>
+          <li>Service + FAQ pages built</li>
+          <li>Re-probed on delivery</li>
+        </ul>
+        <a class="buy" id="buy-local-fix" data-sku="local_fix" href="https://buy.stripe.com/7sY6oI2IOcQH1NZcuH7Re04">Book the fix — $1,497</a>
+      </div>
+      <div class="tier">
+        <h3>Full Local Overhaul</h3>
+        <div class="price">$2,500</div>
+        <p class="turn">30 days</p>
+        <ul>
+          <li>Everything in Fix</li>
+          <li>All locations &amp; service lines</li>
+          <li>Full entity + NAP correction</li>
+          <li>Review-platform strategy</li>
+          <li>30 &amp; 60-day re-probes</li>
+        </ul>
+        <a class="buy" id="buy-local-overhaul" data-sku="local_overhaul" href="https://buy.stripe.com/dRmfZifvA6sjgITamz7Re05">Book the overhaul — $2,500</a>
+      </div>
+    </div>
+    <p class="lede" style="margin-top:22px">Run an ecommerce store instead?
+      <a href="/" style="color:var(--accent)">See the store version &rarr;</a></p>
+  </section>
+
+  <footer>
+    <p class="legal-name"><strong>322 Media LLC</strong></p>
+    <p>Questions or refunds: <a href="mailto:support@aivisibilityfix.co">support@aivisibilityfix.co</a></p>
+    <p class="addr">Registered agent: Northwest Registered Agent Service Inc,<br>
+    30 N Gould St Ste N, Sheridan, WY 82801, USA</p>
+    <p class="policy"><strong>Delivery &amp; refunds:</strong> Audit delivered within 48 hours;
+    full refund if not delivered.</p>
+    <p class="fine">Assistant answers are non-deterministic and vary by phrasing, location and
+    session. Shortlists shown were captured on the dates stated in each audit and are a point-in-time
+    observation, not a live feed. We do not guarantee placement on any assistant's shortlist, any
+    ranking, or any citation count.</p>
+    <a class="back" href="/">&larr; aivisibilityfix.co</a>
+  </footer>
+
+</div>
+</body>
+</html>
