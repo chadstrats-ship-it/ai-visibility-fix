@@ -975,7 +975,11 @@ def cmd_export(args):
 
         comps = a["ai_visibility"]["competitors_named"]
         g = a["ai_visibility"].get("citation_gap") or {}
-        competitor = g.get("peer") or (comps[0] if comps else "")
+        pr = a["ai_visibility"].get("local_probe") or {}
+        # Local rows must cite the business the assistant actually named, not an
+        # OpenRush peer domain - which can be another prospect on our own list.
+        named = pr.get("named") or []
+        competitor = named[0] if named else (g.get("peer") or (comps[0] if comps else ""))
         fn = first_name_from(d["recipient"])
         if not fn:
             no_name += 1
