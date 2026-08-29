@@ -3,7 +3,7 @@
 import argparse, csv, json, os, re, sys, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -241,14 +241,21 @@ def derive_category(title, h1, meta):
     return " ".join(words[:3]) or "products"
 
 
-def derive_brand(title, domain):
-    """First title segment, but only if it reads like a name - else the domain root.
+def derive_brand(title, domain, site_name=None):
+    """og:site_name, else first title segment that reads like a name, else root.
 
     Titles such as "The San Francisco Bay Area's #1 Fitness Superstore" have no
     delimiter, so segment[0] is the whole tagline. Falling back to the domain
-    root is always safe and is what the recipient calls themselves anyway.
+    root is always safe and is what the recipient calls themselves anyway - but
+    it renders "shopinthekitchen.com" as "Shopinthekitchen", which reads as
+    machine-generated in a first line. og:site_name is the brand as the business
+    writes it ("Shop in the Kitchen"), so prefer it when it is present and sane.
     """
     root = domain.split(".")[0].replace("-", " ")
+    if site_name:
+        sn = re.sub(r"\s+", " ", site_name).strip()
+        if sn and len(sn) <= 32 and len(sn.split()) <= 5:
+            return sn
     # Titles are often "<service> in <city> | <Brand>", so score every segment
     # instead of blindly taking the first.
     descriptive = re.compile(
@@ -373,7 +380,8 @@ def cmd_audit(args):
 
     hp = parse_page(home.text)
     cat = args.category or derive_category(hp["title"], hp["h1"], hp["meta_description"])
-    brand = derive_brand(hp["title"], domain)
+    _og = hp["soup"].find("meta", property="og:site_name") if hp.get("soup") else None
+    brand = derive_brand(hp["title"], domain, _og.get("content") if _og else None)
     schema = check_schema(hp)
 
     purl = find_product_url(domain, hp["soup"])
@@ -615,8 +623,44 @@ EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 # Only pages a business publishes in order to be contacted. Privacy-policy
 # inboxes are published for data-subject requests, not sales - excluded.
+# First block is Shopify (DTC lane); second is the WordPress/local-service
+# shape - those sites keep the address behind /contact-us/ with a trailing
+# slash, or on a new-patient / appointment page rather than /about.
 ENRICH_PATHS = ["/pages/contact", "/pages/contact-us", "/pages/about",
-                "/pages/about-us", "/contact", "/about"]
+                "/pages/about-us", "/contact", "/about",
+                "/contact-us/", "/contact/", "/contact-us", "/about-us/",
+                "/about-us", "/contact-our-office/", "/locations/",
+                "/new-patients/", "/appointments/", "/our-team/", "/staff/",
+                "/request-appointment/", "/schedule/", "/book/"]
+
+# Small-business hosts hide addresses two ways: Cloudflare's email-protection
+# shim, and "info [at] example [dot] com". Both are published addresses - the
+# obfuscation is anti-harvester, not a do-not-contact signal - but a plain
+# regex sees neither, which is most of the local lane's miss rate.
+# The separators must be EXPLICITLY obfuscated - a bracketed "at"/"@", or the
+# spelled-out word "dot". Accepting a bare " at " plus a literal "." matches
+# ordinary prose: "...reach us at looklab. Thank you" yielded m@looklab.thank,
+# which survived the domain-root check because "looklab" is a substring of it.
+# A genuinely plain-text address is already caught by EMAIL_RE.
+AT_OBFUSCATED = re.compile(
+    r"([A-Za-z0-9._%+-]+)\s*(?:\[\s*(?:at|@)\s*\]|\(\s*(?:at|@)\s*\)|\s+at\s+)\s*"
+    r"([A-Za-z0-9-]+(?:\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+)\s*[A-Za-z0-9-]+)*)"
+    r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+)\s*([A-Za-z]{2,24})", re.I)
+
+# Defence in depth: a deobfuscated candidate must land on a plausible TLD.
+KNOWN_TLDS = {"com", "net", "org", "co", "io", "us", "uk", "ca", "shop", "store",
+              "biz", "info", "dental", "care", "health", "clinic", "spa", "coffee",
+              "life", "app", "dev", "me", "tv", "gear", "supply", "fitness"}
+
+
+def _decode_cfemail(hexstr):
+    """Cloudflare email-protection: byte 0 is the XOR key for the rest."""
+    try:
+        raw = bytes.fromhex(hexstr)
+        key = raw[0]
+        return "".join(chr(b ^ key) for b in raw[1:])
+    except Exception:
+        return ""
 
 
 def emails_from(html, domain):
@@ -627,7 +671,27 @@ def emails_from(html, domain):
             e = a["href"][7:].split("?")[0].strip()
             if EMAIL_RE.fullmatch(e):
                 out.append(e)
+    # Cloudflare-obfuscated addresses (data-cfemail, or the #hex in the href).
+    for el in soup.find_all(attrs={"data-cfemail": True}):
+        d = _decode_cfemail(el["data-cfemail"])
+        if EMAIL_RE.fullmatch(d):
+            out.append(d)
+    for a in soup.find_all("a", href=True):
+        h = a["href"]
+        if "/cdn-cgi/l/email-protection#" in h:
+            d = _decode_cfemail(h.split("#", 1)[1])
+            if EMAIL_RE.fullmatch(d):
+                out.append(d)
     out += EMAIL_RE.findall(html or "")
+    # "info [at] example [dot] com" -> info@example.com
+    for m in AT_OBFUSCATED.finditer(soup.get_text(" ") if soup else ""):
+        lp, mid, tld = m.groups()
+        if tld.lower() not in KNOWN_TLDS:
+            continue
+        mid = re.sub(r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+)\s*", ".", mid, flags=re.I)
+        cand = "%s@%s.%s" % (lp, mid, tld)
+        if EMAIL_RE.fullmatch(cand):
+            out.append(cand)
     parts = domain.split(".")
     root = parts[-2] if len(parts) > 1 else domain
     good = []
@@ -639,6 +703,13 @@ def emails_from(html, domain):
         if any(e.endswith(x) for x in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")):
             continue
         if "sentry" in dm or "wixpress" in dm:
+            continue
+        # Helpdesk tenants (therepublicoftea.zendesk.com) contain the brand stem,
+        # so they survive the root check below - but they are ticket queues, not
+        # a business contact, and outreach sent there is filed, never read.
+        if any(dm.endswith("." + h) or dm == h for h in
+               ("zendesk.com", "freshdesk.com", "helpscout.net", "intercom-mail.com",
+                "gorgias.com", "kustomer.com", "front.com", "hubspot.com")):
             continue
         if root not in dm:
             continue
@@ -681,21 +752,52 @@ def enrich_file(f):
             continue
         dom = r["domain"]
         found = src = None
-        for p in ENRICH_PATHS:
-            resp = get("https://%s%s" % (dom, p))
+
+        # Fetch the homepage once: it yields both a footer-address fallback and
+        # the site's own contact links, which beat guessing paths - a practice
+        # calling its page /contact-our-office/ is invisible to a static list.
+        home_emails = []
+        candidates = []
+        home = get("https://%s/" % dom)
+        if home is not None and home.status_code == 200:
+            home_emails = emails_from(home.text, dom)
+            soup = BeautifulSoup(home.text, "html.parser")
+            for a in soup.find_all("a", href=True):
+                href = a["href"].strip()
+                label = (a.get_text(" ") or "").strip().lower()
+                if href.lower().startswith(("mailto:", "tel:", "javascript:", "#")):
+                    continue
+                hay = (href + " " + label).lower()
+                if not any(k in hay for k in ("contact", "about", "appointment",
+                                              "new-patient", "new patient",
+                                              "our-team", "our team", "staff",
+                                              "locations", "reach-us")):
+                    continue
+                u = urljoin("https://%s/" % dom, href)
+                host = urlparse(u).netloc.lower().replace("www.", "")
+                if host != dom.replace("www.", ""):
+                    continue          # never wander off the prospect's own site
+                if u not in candidates:
+                    candidates.append(u)
+                if len(candidates) >= 6:
+                    break
+
+        tried = set()
+        for u in candidates + ["https://%s%s" % (dom, p) for p in ENRICH_PATHS]:
+            if u in tried:
+                continue
+            tried.add(u)
+            resp = get(u)
             if resp is None or resp.status_code != 200:
                 continue
             es = emails_from(resp.text, dom)
             if es:
-                found, src = es[0], "https://%s%s" % (dom, p)
+                found, src = es[0], u
                 break
             time.sleep(0.4)
-        if not found:
-            resp = get("https://%s/" % dom)
-            if resp is not None and resp.status_code == 200:
-                es = emails_from(resp.text, dom)
-                if es:
-                    found, src = es[0], "https://%s/ (footer)" % dom
+
+        if not found and home_emails:
+            found, src = home_emails[0], "https://%s/ (footer)" % dom
         if found:
             r["email"], r["email_source"] = found, src
             hits += 1
