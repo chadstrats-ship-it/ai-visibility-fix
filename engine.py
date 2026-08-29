@@ -101,7 +101,13 @@ def norm_domain(d):
 
 def get(url, _retry=True, **kw):
     try:
-        return requests.get(url, headers=HDRS, timeout=TIMEOUT, allow_redirects=True, **kw)
+        r = requests.get(url, headers=HDRS, timeout=TIMEOUT, allow_redirects=True, **kw)
+        # Without a charset in the Content-Type header requests falls back to
+        # ISO-8859-1, which turns UTF-8 brand names into mojibake ("ElaMar Skin"
+        # -> "El?Mar Skin") and would send that straight into an email.
+        if r is not None and "charset" not in (r.headers.get("content-type") or "").lower():
+            r.encoding = r.apparent_encoding or r.encoding
+        return r
     except Exception as e:
         # Many small-business hosts only answer on the www host.
         if _retry and "://www." not in url:
@@ -261,17 +267,30 @@ def derive_brand(title, domain, site_name=None):
     descriptive = re.compile(
         r"\b(in|near|serving|best|top|official|home|welcome|your|we|the)\b|,", re.I)
     stem = re.sub(r"[^a-z]", "", root.lower())[:4]
-    for seg in re.split(r"[|\-–—:·]", title or ""):
+
+    def ok(seg):
+        """A segment is the brand only if it is short, non-descriptive, and
+        actually shares the domain stem - otherwise it is a product category or
+        a button label ("Duvet Covers", "Book Now")."""
+        return (seg and len(seg) <= 32 and len(seg.split()) <= 4
+                and not descriptive.search(seg)
+                and stem and stem in re.sub(r"[^a-z]", "", seg.lower()))
+
+    # "+" splits "Viva Day Spa + Med Spa" into the brand and its service list.
+    for seg in re.split(r"[|\-–—:·+•]", title or ""):
         seg = re.sub(r"\s+", " ", seg).strip()
-        if not seg or len(seg) > 32 or len(seg.split()) > 4:
+        if not seg:
             continue
-        if descriptive.search(seg):
-            continue
-        # The segment must actually share the domain stem, otherwise it is a
-        # product category or a button label ("Duvet Covers", "Book Now"),
-        # not the brand.
-        if stem and stem in re.sub(r"[^a-z]", "", seg.lower()):
+        if ok(seg):
             return seg
+        # A segment can be the brand plus a trailing locality ("Suddenly Slimmer
+        # Med Spa Phoenix"). Drop trailing words while the stem survives, rather
+        # than falling back to the domain root, which reads as machine-generated.
+        words = seg.split()
+        for n in range(len(words) - 1, 1, -1):
+            cand = " ".join(words[:n])
+            if ok(cand):
+                return cand
     return " ".join(w.capitalize() for w in root.split())
 
 
@@ -891,8 +910,20 @@ def cmd_draft(args):
         a = json.loads(ad.read_text(encoding="utf-8"))
         # Do not pitch "you are invisible" to a brand that is already winning -
         # it is provably false to them and burns the prospect permanently.
+        #
+        # DTC ONLY. Google AI Overview does not fire on local-intent queries (it
+        # serves a map pack), so Overview citation share does not measure local
+        # visibility at all - the two are independent. vivadayspa.com held 70.4%
+        # Overview share while being absent from the Austin med-spa shortlist, so
+        # this gate was blocking a pitch the probe had already proven true.
+        #
+        # The local lane's gate is compose()'s honest hook instead: it returns None
+        # unless probe["absent_from"] is non-empty, and absent_from only lists an
+        # engine that was actually checked AND did not name the business. A business
+        # the assistant names (customairco.com) still yields absent_from == [] and is
+        # still refused. Absence is observed, never assumed.
         g = a["ai_visibility"].get("citation_gap") or {}
-        if (g.get("own_share_pct") or 0) >= PERFORMING_SHARE_PCT:
+        if r["lane"] != "local" and (g.get("own_share_pct") or 0) >= PERFORMING_SHARE_PCT:
             log("  skip %s (already at %.1f%% citation share - pitch would be false)"
                 % (r["domain"], g["own_share_pct"]))
             skipped.append((r["domain"], "performing"))
