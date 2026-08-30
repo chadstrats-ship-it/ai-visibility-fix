@@ -30,4 +30,13 @@ result before adding to `raw/seed_domains.json` — `DIRECTORY_DOMAINS` and
 `NATIONAL_CHAINS` in `engine.py` are the backstop, not the first filter.
 
 `coverage.total_available` in the response tells you how deep the category goes
-before you invest in it.
+before you invest in it — and `limit` goes well past the default: the same coffee
+seeds returned 12 competitors at `limit=12` and reported 80 available, then 30 at
+`limit=30` reporting 152. **Mine a proven category deeper before testing a new
+one** — it is a far better yield per call than exploring.
+
+Some categories are structurally unusable because the SERP is entirely editorial.
+Mattresses returned 12 results of which *zero* were DTC brands (naplab,
+sleepfoundation, ConsumerReports, Sleepopolis, mattressnerd, Reddit, NYT, Forbes)
+— the same shape as beauty/fashion. Check the first result set for actual brands
+before adding a category; publisher-dominated ones never yield prospects.
