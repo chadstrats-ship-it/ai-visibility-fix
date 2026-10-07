@@ -1071,7 +1071,7 @@ footer{{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);color:
 <h2>What to fix</h2>
 <ol>{fixes}</ol>
 <a class="cta" href="{base}/">See the $197 audit &rarr;</a>
-<footer>Measured by 322 Media LLC. Citation share is a sampled observation of Google AI Overview
+<footer>Measured by AI Visibility Fix. Citation share is a sampled observation of Google AI Overview
 for this category, measured against the named competitor domains above. AI answers are
 non-deterministic; treat movement as directional. No ranking or citation count is guaranteed.</footer>
 </div></body></html>
